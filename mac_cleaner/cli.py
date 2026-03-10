@@ -325,9 +325,10 @@ def build_parser() -> argparse.ArgumentParser:
         "-s", "--scan-only", action="store_true", help="只扫描不清理"
     )
     p_scan.add_argument(
-        "--sudo", action="store_true", help="对系统级路径使用 sudo 提权删除"
+        "--no-sudo", dest="sudo", action="store_false",
+        help="禁用 sudo 提权（默认对系统级路径自动 sudo）"
     )
-    p_scan.set_defaults(func=_cmd_scan)
+    p_scan.set_defaults(func=_cmd_scan, sudo=True)
 
     # list
     p_list = sub.add_parser("list", help="列出所有支持的清理分类")
@@ -339,9 +340,10 @@ def build_parser() -> argparse.ArgumentParser:
         "-n", "--dry-run", action="store_true", help="模拟运行，不删除文件"
     )
     p_quick.add_argument(
-        "--sudo", action="store_true", help="对系统级路径使用 sudo 提权删除"
+        "--no-sudo", dest="sudo", action="store_false",
+        help="禁用 sudo 提权（默认对系统级路径自动 sudo）"
     )
-    p_quick.set_defaults(func=_cmd_quick)
+    p_quick.set_defaults(func=_cmd_quick, sudo=True)
 
     return parser
 
@@ -354,7 +356,7 @@ def main() -> None:
         args.categories = None
         args.dry_run = False
         args.scan_only = False
-        args.sudo = False
+        args.sudo = True
         _cmd_scan(args)
     else:
         args.func(args)
