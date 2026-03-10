@@ -214,9 +214,12 @@ def _do_clean(
     selected: list[str],
     results: dict[str, ScanResult],
     dry_run: bool = False,
+    use_sudo: bool = False,
 ) -> None:
     if dry_run:
         print(f"\n  {colored('[DRY RUN]', 'magenta')} 仅模拟，不会删除任何文件\n")
+    if use_sudo:
+        print(f"\n  {colored('[SUDO]', 'yellow')} 系统级路径将使用 sudo 提权删除\n")
 
     total_freed = 0
     for key in selected:
@@ -226,7 +229,8 @@ def _do_clean(
         if cat is None:
             continue
         progress_cb = _make_progress_printer(cat.name, cat.icon)
-        cr = clean(results[key], dry_run=dry_run, on_progress=progress_cb)
+        cr = clean(results[key], dry_run=dry_run, on_progress=progress_cb,
+                    use_sudo=use_sudo)
         sys.stdout.write("\r\033[K")
         sys.stdout.flush()
         print(
@@ -258,11 +262,12 @@ def _cmd_scan(args: argparse.Namespace) -> None:
         print("  取消操作。\n")
         return
 
+    sudo = getattr(args, "sudo", False)
     if args.dry_run:
-        _do_clean(selected, results, dry_run=True)
+        _do_clean(selected, results, dry_run=True, use_sudo=sudo)
     else:
         if _confirm_clean(selected, results):
-            _do_clean(selected, results, dry_run=False)
+            _do_clean(selected, results, dry_run=False, use_sudo=sudo)
         else:
             print("  取消操作。\n")
 
@@ -289,12 +294,13 @@ def _cmd_quick(args: argparse.Namespace) -> None:
         return
 
     selected = list(results.keys())
+    sudo = getattr(args, "sudo", False)
     if args.dry_run:
-        _do_clean(selected, results, dry_run=True)
+        _do_clean(selected, results, dry_run=True, use_sudo=sudo)
         return
 
     if _confirm_clean(selected, results):
-        _do_clean(selected, results, dry_run=False)
+        _do_clean(selected, results, dry_run=False, use_sudo=sudo)
     else:
         print("  取消操作。\n")
 
@@ -318,6 +324,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument(
         "-s", "--scan-only", action="store_true", help="只扫描不清理"
     )
+    p_scan.add_argument(
+        "--sudo", action="store_true", help="对系统级路径使用 sudo 提权删除"
+    )
     p_scan.set_defaults(func=_cmd_scan)
 
     # list
@@ -328,6 +337,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_quick = sub.add_parser("quick", help="快速清理（仅低风险分类）")
     p_quick.add_argument(
         "-n", "--dry-run", action="store_true", help="模拟运行，不删除文件"
+    )
+    p_quick.add_argument(
+        "--sudo", action="store_true", help="对系统级路径使用 sudo 提权删除"
     )
     p_quick.set_defaults(func=_cmd_quick)
 
@@ -342,6 +354,7 @@ def main() -> None:
         args.categories = None
         args.dry_run = False
         args.scan_only = False
+        args.sudo = False
         _cmd_scan(args)
     else:
         args.func(args)
