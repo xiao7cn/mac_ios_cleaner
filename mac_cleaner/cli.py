@@ -260,24 +260,41 @@ def _do_clean(
 def _cmd_scan(args: argparse.Namespace) -> None:
     _print_header()
     keys = args.categories.split(",") if args.categories else None
+    sudo = getattr(args, "sudo", False)
+
     results = _scan_all(keys)
     grand_total = _print_summary(results)
     if grand_total == 0 or args.scan_only:
         return
 
-    selected = _pick_categories(results)
-    if not selected:
-        print("  取消操作。\n")
-        return
+    while results:
+        selected = _pick_categories(results)
+        if not selected:
+            print("  退出。\n")
+            return
 
-    sudo = getattr(args, "sudo", False)
-    if args.dry_run:
-        _do_clean(selected, results, dry_run=True, use_sudo=sudo)
-    else:
-        if _confirm_clean(selected, results):
+        if args.dry_run:
+            _do_clean(selected, results, dry_run=True, use_sudo=sudo)
+        elif _confirm_clean(selected, results):
             _do_clean(selected, results, dry_run=False, use_sudo=sudo)
+            for k in selected:
+                results.pop(k, None)
         else:
-            print("  取消操作。\n")
+            print("  跳过。\n")
+
+        if not results:
+            break
+
+        print(f"  {dim('─' * 60)}")
+        remaining = sum(r.total_size for r in results.values())
+        print(
+            f"\n  📋  还有 {bold(str(len(results)))} 个分类可清理，"
+            f"共 {colored(format_size(remaining), 'yellow')}\n"
+        )
+        again = input(f"  继续选择其它分类？ {dim('[Y/n]')} ").strip().lower()
+        if again in ("n", "no"):
+            print("  退出。\n")
+            return
 
 
 def _cmd_list(args: argparse.Namespace) -> None:
