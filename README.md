@@ -20,7 +20,8 @@
 | 🗄️ 系统缓存 | 安全 | macOS 和应用程序的缓存文件 |
 | 📋 系统日志 | 安全 | 系统和应用程序的日志文件 |
 | 💥 崩溃报告 | 安全 | 应用崩溃诊断报告 |
-| 🔨 Xcode 垃圾 | 中等 | DerivedData、设备支持、归档 |
+| 🔨 Xcode 垃圾 | 中等 | DerivedData、设备支持、归档、SwiftUI 预览缓存 |
+| 📲 Xcode 模拟器 | 谨慎 | 模拟器运行时、设备数据和缓存（常占数十 GB） |
 | 🍺 Homebrew 缓存 | 安全 | Homebrew 包缓存 |
 | 📦 包管理器缓存 | 安全 | npm/pip/yarn/conda/CocoaPods/Gradle/Maven/Cargo/Go |
 | 📎 邮件附件 | 中等 | Mail 下载的附件缓存 |
