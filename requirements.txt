@@ -1,0 +1,1 @@
+# mac-cleaner has no external dependencies — stdlib only.

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "mac-cleaner"
+version = "0.1.0"
+description = "macOS 磁盘垃圾清理工具 — 命令行版 CleanMyMac"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "xiao7cn"}]
+
+[project.scripts]
+mac-cleaner = "mac_cleaner.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mac_cleaner*"]
