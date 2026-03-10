@@ -2,6 +2,7 @@
 
 import sys
 import argparse
+import subprocess
 import threading
 import time
 from itertools import cycle
@@ -9,7 +10,7 @@ from itertools import cycle
 from . import __version__
 from .categories import CATEGORIES, get_category, list_category_keys
 from .scanner import scan_category, ScanResult
-from .cleaner import clean
+from .cleaner import clean, sudo_preflight
 from .utils import (
     format_size,
     colored,
@@ -218,8 +219,13 @@ def _do_clean(
 ) -> None:
     if dry_run:
         print(f"\n  {colored('[DRY RUN]', 'magenta')} 仅模拟，不会删除任何文件\n")
-    if use_sudo:
-        print(f"\n  {colored('[SUDO]', 'yellow')} 系统级路径将使用 sudo 提权删除\n")
+
+    if use_sudo and not dry_run:
+        try:
+            sudo_preflight()
+        except (subprocess.CalledProcessError, KeyboardInterrupt):
+            print(f"  {colored('✗', 'red')} sudo 认证失败，将跳过系统级文件\n")
+            use_sudo = False
 
     total_freed = 0
     for key in selected:
@@ -239,6 +245,8 @@ def _do_clean(
             f"({cr.deleted_count} 个文件/目录已删除)"
         )
         total_freed += cr.freed_bytes
+        for msg in cr.messages:
+            print(f"    {colored('ℹ', 'cyan')} {msg}")
         if cr.failed:
             for msg in cr.failed[:5]:
                 print(f"    {colored('⚠', 'yellow')} {msg}")

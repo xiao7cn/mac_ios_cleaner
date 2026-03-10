@@ -3,6 +3,7 @@
 import os
 import subprocess
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -13,9 +14,26 @@ ProgressCallback = Callable[[int, int, str], None]  # (current, total, path)
 
 HOME = str(Path.home())
 
+SIMCTL_RUNTIME_PARENTS = {
+    "/Library/Developer/CoreSimulator/Volumes",
+    "/Library/Developer/CoreSimulator/Images",
+    "/Library/Developer/CoreSimulator/Profiles/Runtimes",
+}
+
 
 def _needs_sudo(path: Path) -> bool:
     return not str(path).startswith(HOME)
+
+
+def _is_simulator_runtime(path: Path) -> bool:
+    return str(path.parent) in SIMCTL_RUNTIME_PARENTS
+
+
+def sudo_preflight() -> None:
+    """Prompt for sudo password once upfront so later calls don't block."""
+    print("  🔑 需要管理员权限来清理系统级文件，请输入密码：")
+    subprocess.run(["sudo", "-v"], check=True)
+    print()
 
 
 def _sudo_rm(path: Path) -> None:
@@ -26,6 +44,22 @@ def _sudo_rm(path: Path) -> None:
     )
 
 
+def _delete_simulator_runtimes() -> tuple[bool, str]:
+    """Delete all simulator runtimes via xcrun simctl."""
+    try:
+        r = subprocess.run(
+            ["xcrun", "simctl", "runtime", "delete", "all"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if r.returncode == 0:
+            return True, r.stdout.strip()
+        return False, r.stderr.strip()
+    except FileNotFoundError:
+        return False, "xcrun 未找到，请确认已安装 Xcode Command Line Tools"
+    except subprocess.TimeoutExpired:
+        return False, "simctl runtime delete 超时"
+
+
 @dataclass
 class CleanResult:
     category_key: str
@@ -33,6 +67,7 @@ class CleanResult:
     deleted_count: int = 0
     failed: list[str] = field(default_factory=list)
     sudo_used: bool = False
+    messages: list[str] = field(default_factory=list)
 
 
 def clean(
@@ -44,9 +79,26 @@ def clean(
     result = CleanResult(category_key=scan_result.category_key)
     total = len(scan_result.files)
 
-    for i, entry in enumerate(scan_result.files, 1):
+    sim_runtime_entries = [e for e in scan_result.files if _is_simulator_runtime(e.path)]
+    regular_entries = [e for e in scan_result.files if not _is_simulator_runtime(e.path)]
+
+    if sim_runtime_entries and not dry_run:
+        sim_size = sum(e.size for e in sim_runtime_entries)
+        ok, msg = _delete_simulator_runtimes()
+        if ok:
+            result.freed_bytes += sim_size
+            result.deleted_count += len(sim_runtime_entries)
+            result.messages.append(f"通过 simctl 删除了 {len(sim_runtime_entries)} 个模拟器运行时")
+        else:
+            result.failed.append(f"simctl runtime delete: {msg}")
+    elif sim_runtime_entries and dry_run:
+        for e in sim_runtime_entries:
+            result.freed_bytes += e.size
+            result.deleted_count += 1
+
+    for i, entry in enumerate(regular_entries, 1):
         if on_progress:
-            on_progress(i, total, str(entry.path))
+            on_progress(i, len(regular_entries), str(entry.path))
         try:
             if not dry_run:
                 if entry.is_bulk or entry.path.is_dir():
@@ -62,10 +114,11 @@ def clean(
                     result.freed_bytes += entry.size
                     result.deleted_count += 1
                     result.sudo_used = True
-                except subprocess.CalledProcessError:
-                    result.failed.append(f"sudo 删除失败: {entry.path}")
+                except subprocess.CalledProcessError as e:
+                    err = e.stderr.decode().strip() if e.stderr else "未知错误"
+                    result.failed.append(f"sudo 失败 {entry.path}: {err}")
             else:
-                result.failed.append(f"权限不足: {entry.path} (用 --sudo 提权)")
+                result.failed.append(f"权限不足: {entry.path}")
         except FileNotFoundError:
             result.deleted_count += 1
         except OSError as e:
