@@ -18,6 +18,7 @@ class ScanPath:
     glob: str = "**/*"
     min_age_days: int = 0
     description: str = ""
+    bulk: bool = False  # True = scan top-level children as whole units (rmtree)
 
 
 @dataclass
@@ -116,26 +117,32 @@ CATEGORIES: list[Category] = [
         scan_paths=[
             ScanPath(
                 f"{HOME}/Library/Developer/CoreSimulator/Devices",
+                glob="*", bulk=True,
                 description="模拟器设备数据",
             ),
             ScanPath(
                 f"{HOME}/Library/Developer/CoreSimulator/Caches",
+                glob="*", bulk=True,
                 description="模拟器缓存",
             ),
             ScanPath(
                 f"{HOME}/Library/Developer/CoreSimulator/Temp",
+                glob="*", bulk=True,
                 description="模拟器临时文件",
             ),
             ScanPath(
                 "/Library/Developer/CoreSimulator/Volumes",
+                glob="*", bulk=True,
                 description="模拟器运行时卷（cryptex）",
             ),
             ScanPath(
                 "/Library/Developer/CoreSimulator/Images",
+                glob="*", bulk=True,
                 description="模拟器运行时镜像",
             ),
             ScanPath(
                 "/Library/Developer/CoreSimulator/Profiles/Runtimes",
+                glob="*", bulk=True,
                 description="模拟器运行时配置",
             ),
         ],

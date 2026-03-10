@@ -193,6 +193,23 @@ def _confirm_clean(selected: list[str], results: dict[str, ScanResult]) -> bool:
     return answer in ("y", "yes")
 
 
+def _make_progress_printer(cat_name: str, cat_icon: str):
+    """Return a callback that prints live progress on a single line."""
+    def on_progress(current: int, total: int, path: str) -> None:
+        name = path.rsplit("/", 1)[-1]
+        if len(name) > 40:
+            name = name[:37] + "..."
+        line = (
+            f"  ⏳ {cat_icon}  {cat_name}  "
+            f"{progress_bar(current, total, 20)}  "
+            f"{current}/{total}  "
+            f"{dim(name)}"
+        )
+        sys.stdout.write(f"\r\033[K{line}")
+        sys.stdout.flush()
+    return on_progress
+
+
 def _do_clean(
     selected: list[str],
     results: dict[str, ScanResult],
@@ -208,12 +225,14 @@ def _do_clean(
         cat = get_category(key)
         if cat is None:
             continue
-        spinner = Spinner(f"正在清理: {cat.icon}  {cat.name} ...").start()
-        cr = clean(results[key], dry_run=dry_run)
-        spinner.stop(
-            f"✓ {cat.icon}  {cat.name}  "
+        progress_cb = _make_progress_printer(cat.name, cat.icon)
+        cr = clean(results[key], dry_run=dry_run, on_progress=progress_cb)
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+        print(
+            f"  ✓ {cat.icon}  {cat.name}  "
             f"释放 {colored(format_size(cr.freed_bytes), 'green')}  "
-            f"({cr.deleted_count} 个文件已删除)"
+            f"({cr.deleted_count} 个文件/目录已删除)"
         )
         total_freed += cr.freed_bytes
         if cr.failed:
